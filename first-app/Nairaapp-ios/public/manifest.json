@@ -1,0 +1,19 @@
+{
+  "name": "NairaFly iOS",
+  "short_name": "NairaFly",
+  "description": "iPhone-exclusive Naira rewards, wallet & verified NUBAN payouts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090D16",
+  "theme_color": "#059669",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

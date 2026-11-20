@@ -1,0 +1,9 @@
+{
+  "name": "nairafly-ios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NairaFly iOS-Exclusive Fintech & Rewards Web App with Paystack & Supabase Backend",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
