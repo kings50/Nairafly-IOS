@@ -8,7 +8,39 @@
 </head>
 <body>
   <div class="phone-shell">
-    <div id="mainView">
+    <!-- SIGN IN / CREATE ACCOUNT GATE -->
+    <div id="authView" class="card" style="margin-top: 24px;">
+      <div class="card-title">
+        <span id="authHeading">Sign In to NairaFly</span>
+        <span class="badge-live">NGN Wallet</span>
+      </div>
+      <p id="authSubtext" style="font-size:13px; color:var(--muted); line-height:1.5; margin-top:0;">
+        Sign in with your email to access your wallet, claim rewards, and withdraw Naira.
+      </p>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+        <button type="button" class="action-btn" id="modeSignInBtn" onclick="setAuthMode('signin')" style="background:var(--emerald); color:#fff; border:none;">
+          Sign In
+        </button>
+        <button type="button" class="action-btn" id="modeSignUpBtn" onclick="setAuthMode('signup')" style="background:var(--bg); color:var(--text); border:1px solid var(--border);">
+          Create Account
+        </button>
+      </div>
+
+      <form id="authForm">
+        <div class="input-group hidden" id="authNameGroup">
+          <label class="input-label" for="authName">Full Name</label>
+          <input type="text" id="authName" placeholder="e.g. Chinedu Okafor" />
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="authEmail">Email Address</label>
+          <input type="email" id="authEmail" required placeholder="you@example.com" />
+        </div>
+        <button type="submit" class="primary-btn" id="authSubmitBtn">Continue to Dashboard</button>
+      </form>
+    </div>
+
+    <div id="mainView" class="hidden">
       <!-- HOME TAB -->
       <div id="homeTab">
         <div class="wallet-card">
@@ -126,17 +158,123 @@
 
   <script>
     let resolvedAccountName = '';
+    let authMode = 'signin';
+
+    function setAuthMode(mode) {
+      authMode = mode === 'signup' ? 'signup' : 'signin';
+      const heading = document.getElementById('authHeading');
+      const subtext = document.getElementById('authSubtext');
+      const nameGroup = document.getElementById('authNameGroup');
+      const submitBtn = document.getElementById('authSubmitBtn');
+      const signInBtn = document.getElementById('modeSignInBtn');
+      const signUpBtn = document.getElementById('modeSignUpBtn');
+
+      if (authMode === 'signup') {
+        if (heading) heading.textContent = 'Create NairaFly Account';
+        if (subtext) subtext.textContent = 'Create your account to start claiming task rewards and managing your Naira wallet.';
+        if (nameGroup) nameGroup.classList.remove('hidden');
+        if (submitBtn) submitBtn.textContent = 'Create Account & Continue';
+        if (signUpBtn) {
+          signUpBtn.style.background = 'var(--emerald)';
+          signUpBtn.style.color = '#fff';
+          signUpBtn.style.border = 'none';
+        }
+        if (signInBtn) {
+          signInBtn.style.background = 'var(--bg)';
+          signInBtn.style.color = 'var(--text)';
+          signInBtn.style.border = '1px solid var(--border)';
+        }
+      } else {
+        if (heading) heading.textContent = 'Sign In to NairaFly';
+        if (subtext) subtext.textContent = 'Sign in with your email to access your wallet, claim rewards, and withdraw Naira.';
+        if (nameGroup) nameGroup.classList.add('hidden');
+        if (submitBtn) submitBtn.textContent = 'Continue to Dashboard';
+        if (signInBtn) {
+          signInBtn.style.background = 'var(--emerald)';
+          signInBtn.style.color = '#fff';
+          signInBtn.style.border = 'none';
+        }
+        if (signUpBtn) {
+          signUpBtn.style.background = 'var(--bg)';
+          signUpBtn.style.color = 'var(--text)';
+          signUpBtn.style.border = '1px solid var(--border)';
+        }
+      }
+    }
+
+    function applyAuthGate() {
+      const authView = document.getElementById('authView');
+      const mainView = document.getElementById('mainView');
+      const email = getCurrentUserEmail();
+
+      if (email) {
+        if (authView) authView.classList.add('hidden');
+        if (mainView) mainView.classList.remove('hidden');
+      } else {
+        if (authView) authView.classList.remove('hidden');
+        if (mainView) mainView.classList.add('hidden');
+      }
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('authEmail');
+      const nameInput = document.getElementById('authName');
+      const email = (emailInput?.value || '').trim().toLowerCase();
+      if (!email) return;
+
+      const fullName =
+        (nameInput?.value || '').trim() ||
+        email.split('@')[0] ||
+        'NairaFly User';
+      const referralCode = 'NF' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      localStorage.setItem('userEmail', email);
+      localStorage.setItem('nairafly_email', email);
+      localStorage.setItem('nf_user', JSON.stringify({ full_name: fullName, email, referral_code: referralCode }));
+
+      if (window.state && typeof window.state === 'object') {
+        window.state.email = email;
+        window.state.user = { full_name: fullName, email, referral_code: referralCode };
+      }
+
+      try {
+        await fetch('/api/wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upsert_user',
+            email,
+            full_name: fullName,
+            referral_code: referralCode
+          })
+        });
+      } catch (_) {}
+
+      applyAuthGate();
+      switchTab('homeTab');
+      loadEarnTasks(email);
+      if (typeof window.syncWalletFromBackend === 'function') {
+        window.syncWalletFromBackend();
+      }
+      if (typeof window.renderDashboard === 'function') {
+        window.renderDashboard();
+      }
+    }
 
     function getCurrentUserEmail() {
-      if (window.state && window.state.email) return window.state.email;
-      if (window.state && window.state.user && window.state.user.email) return window.state.user.email;
-      if (window.currentUser && window.currentUser.email) return window.currentUser.email;
-      const emailInput = document.querySelector('input[type="email"]');
+      if (window.state && window.state.email) return window.state.email.trim();
+      if (window.state && window.state.user && window.state.user.email) return window.state.user.email.trim();
+      if (window.currentUser && window.currentUser.email) return window.currentUser.email.trim();
+      const savedEmail = localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+      if (savedEmail) return savedEmail.trim();
+      const emailInput = document.getElementById('authEmail') || document.querySelector('input[type="email"]');
       if (emailInput && emailInput.value) return emailInput.value.trim();
-      return localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+      return '';
     }
 
     function switchTab(tabName) {
+      applyAuthGate();
       const homeTab = document.getElementById('homeTab');
       const earnTab = document.getElementById('earnTab');
       const navHome = document.getElementById('navHome');
@@ -398,6 +536,11 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      const authForm = document.getElementById('authForm');
+      if (authForm) {
+        authForm.addEventListener('submit', handleAuthSubmit);
+      }
+      applyAuthGate();
       loadEarnTasks();
     });
   </script>

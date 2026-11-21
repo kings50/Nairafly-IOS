@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 const TASKS = {
-  X_follow: {
+  ig_follow: {
     id: 'ig_follow',
     title: 'Follow our X page',
     rewardKobo: 1500, // ₦15
-    url: 'https://X.com/@godswilleva'
+    url: 'https://x.com/godswilleva'
   },
   tiktok_follow: {
     id: 'tiktok_follow',
@@ -36,12 +36,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ status: false, message: 'Method not allowed' });
   }
 
-  const { email, task_id, proof_note } = req.body || {};
-  const task = TASKS[task_id];
+  const { email, task_id, proof_note, full_name } = req.body || {};
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const lookupKey = task_id === 'X_follow' ? 'ig_follow' : task_id;
+  const task = TASKS[lookupKey];
+
+  if (!cleanEmail) {
+    return res.status(400).json({ status: false, message: 'Email is required.' });
+  }
 
   if (!task) {
     return res.status(400).json({ status: false, message: 'Invalid task.' });
   }
+
+  const fallbackName =
+    (full_name && String(full_name).trim()) ||
+    cleanEmail.split('@')[0] ||
+    'NairaFly User';
 
   const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -49,10 +60,11 @@ export default async function handler(req, res) {
   );
 
   const { data, error } = await supabase.rpc('claim_task_reward', {
-    p_email: email,
+    p_email: cleanEmail,
     p_task_id: task.id,
     p_reward_kobo: task.rewardKobo,
-    p_proof_note: proof_note ? String(proof_note).slice(0, 200) : null
+    p_proof_note: proof_note ? String(proof_note).slice(0, 200) : null,
+    p_full_name: fallbackName
   });
 
   if (error) {
