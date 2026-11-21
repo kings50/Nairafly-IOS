@@ -24,6 +24,8 @@ let state = {
   backendLive: false
 };
 
+let authMode = 'signin';
+
 // 1. Strict iOS-Only Enforcement & Android Install Block
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -78,9 +80,11 @@ function showToast(msg) {
 
 function getCurrentUserEmail() {
   if (state.user && state.user.email) return state.user.email.trim();
-  const emailInput = document.querySelector('input[type="email"]');
+  const savedEmail = localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+  if (savedEmail) return savedEmail.trim();
+  const emailInput = document.getElementById('authEmail') || document.querySelector('input[type="email"]');
   if (emailInput && emailInput.value) return emailInput.value.trim();
-  return localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+  return '';
 }
 
 function populateBankSelects() {
@@ -93,7 +97,83 @@ function populateBankSelects() {
   });
 }
 
-// 3. Real NUBAN 10-Digit Account Name Verification via /api/resolve-account
+// 3. Sign In / Create Account Gate
+function setAuthMode(mode) {
+  authMode = mode === 'signup' ? 'signup' : 'signin';
+  const heading = document.getElementById('authHeading');
+  const subtext = document.getElementById('authSubtext');
+  const nameGroup = document.getElementById('authNameGroup');
+  const submitBtn = document.getElementById('authSubmitBtn');
+  const signInBtn = document.getElementById('modeSignInBtn');
+  const signUpBtn = document.getElementById('modeSignUpBtn');
+
+  if (authMode === 'signup') {
+    if (heading) heading.textContent = 'Create NairaFly Account';
+    if (subtext) subtext.textContent = 'Create your account to start claiming task rewards and managing your Naira wallet.';
+    if (nameGroup) nameGroup.classList.remove('hidden');
+    if (submitBtn) submitBtn.textContent = 'Create Account & Continue';
+    if (signUpBtn) {
+      signUpBtn.style.background = 'var(--emerald)';
+      signUpBtn.style.color = '#fff';
+      signUpBtn.style.border = 'none';
+    }
+    if (signInBtn) {
+      signInBtn.style.background = 'var(--bg)';
+      signInBtn.style.color = 'var(--text)';
+      signInBtn.style.border = '1px solid var(--border)';
+    }
+  } else {
+    if (heading) heading.textContent = 'Sign In to NairaFly';
+    if (subtext) subtext.textContent = 'Sign in with your email to access your wallet, claim rewards, and withdraw Naira.';
+    if (nameGroup) nameGroup.classList.add('hidden');
+    if (submitBtn) submitBtn.textContent = 'Continue to Dashboard';
+    if (signInBtn) {
+      signInBtn.style.background = 'var(--emerald)';
+      signInBtn.style.color = '#fff';
+      signInBtn.style.border = 'none';
+    }
+    if (signUpBtn) {
+      signUpBtn.style.background = 'var(--bg)';
+      signUpBtn.style.color = 'var(--text)';
+      signUpBtn.style.border = '1px solid var(--border)';
+    }
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = (document.getElementById('authEmail')?.value || '').trim().toLowerCase();
+  if (!email) return;
+
+  const fullName =
+    (document.getElementById('authName')?.value || '').trim() ||
+    email.split('@')[0] ||
+    'NairaFly User';
+  const referralCode = 'NF' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  state.user = { full_name: fullName, email, referral_code: referralCode };
+  localStorage.setItem('nf_user', JSON.stringify(state.user));
+  localStorage.setItem('userEmail', email);
+  localStorage.setItem('nairafly_email', email);
+
+  try {
+    await fetch('/api/wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'upsert_user',
+        email,
+        full_name: fullName,
+        referral_code: referralCode
+      })
+    });
+  } catch (_) {}
+
+  renderApp();
+  await syncWalletFromBackend();
+}
+
+// 4. Real NUBAN 10-Digit Account Name Verification via /api/resolve-account
 async function verifyNubanAccount(accountNumber, bankCode, statusElId, onVerified) {
   const box = document.getElementById(statusElId);
   if (!box) return;
@@ -154,7 +234,7 @@ function handleWithdrawAccountInput() {
   verifyWithdrawAccount();
 }
 
-// 4. Real Paystack Checkout Deposit via /api/init-deposit
+// 5. Real Paystack Checkout Deposit via /api/init-deposit
 async function submitDeposit() {
   const email = (document.getElementById('depositEmail')?.value || getCurrentUserEmail() || '').trim();
   const amount = Number(document.getElementById('depositAmount')?.value || 0);
@@ -201,7 +281,7 @@ async function submitDeposit() {
   }
 }
 
-// 5. Check URL for Paystack Redirect Callback (?reference=NF_xxx)
+// 6. Check URL for Paystack Redirect Callback (?reference=NF_xxx)
 async function checkPaystackCallback() {
   const params = new URLSearchParams(window.location.search);
   const reference = params.get('reference') || params.get('trxref');
@@ -235,7 +315,7 @@ async function checkPaystackCallback() {
   }
 }
 
-// 6. Sync Wallet with Supabase via /api/wallet
+// 7. Sync Wallet with Supabase via /api/wallet
 async function syncWalletFromBackend() {
   const email = getCurrentUserEmail();
   if (!email) return;
@@ -267,29 +347,7 @@ async function syncWalletFromBackend() {
   renderDashboard();
 }
 
-async function handleLogin(e) {
-  e.preventDefault();
-  const fullName = document.getElementById('authName')?.value.trim() || 'NairaFly User';
-  const email = document.getElementById('authEmail')?.value.trim().toLowerCase() || '';
-  if (!email) return;
-
-  state.user = { full_name: fullName, email };
-  localStorage.setItem('nf_user', JSON.stringify(state.user));
-  localStorage.setItem('userEmail', email);
-
-  try {
-    await fetch('/api/wallet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'upsert_user', email, full_name: fullName })
-    });
-  } catch (_) {}
-
-  renderApp();
-  await syncWalletFromBackend();
-}
-
-// 7. Withdrawal Submission with Verified Bank Account
+// 8. Withdrawal Submission with Verified Bank Account
 async function submitWithdraw() {
   const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim();
   const bankSelect = document.getElementById('withdrawBankCode');
@@ -353,7 +411,6 @@ async function submitWithdraw() {
     }
     showToast(data.message || 'Could not process withdrawal.');
   } catch (_) {
-    // Local fallback update when backend isn't reachable
     state.balanceNgn -= amount;
     localStorage.setItem('nf_balance', String(state.balanceNgn));
     state.transactions.unshift({
@@ -410,7 +467,7 @@ async function savePayoutBank() {
   renderDashboard();
 }
 
-// 8. Earn Tasks Loader & Claim Flow (/api/tasks)
+// 9. Earn Tasks Loader & Claim Flow (/api/tasks)
 async function loadEarnTasks(userEmail) {
   const container = document.getElementById('earn-tasks-list');
   if (!container) return;
@@ -492,7 +549,7 @@ async function loadEarnTasks(userEmail) {
   }
 }
 
-// 9. UI Rendering & Navigation
+// 10. UI Rendering & Navigation
 function renderDashboard() {
   const greetingEl = document.getElementById('userGreeting');
   if (greetingEl && state.user) {
