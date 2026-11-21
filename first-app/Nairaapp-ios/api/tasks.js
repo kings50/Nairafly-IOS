@@ -10,7 +10,7 @@ const TASKS = {
   tiktok_follow: {
     id: 'tiktok_follow',
     title: 'Follow our TikTok page',
-    rewardKobo: 1500, // ₦1500
+    rewardKobo: 3000000, // ₦30,000
     url: 'https://tiktok.com/@itzskiv0id'
   },
   quick_survey: {
