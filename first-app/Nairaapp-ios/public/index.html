@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
+  <div id="toast" class="toast hidden"></div>
+
   <div class="phone-shell">
     <!-- SIGN IN / CREATE ACCOUNT GATE -->
     <div id="authView" class="card" style="margin-top: 24px;">
@@ -40,11 +42,15 @@
       </form>
     </div>
 
+    <!-- MAIN DASHBOARD -->
     <div id="mainView" class="hidden">
       <!-- HOME TAB -->
       <div id="homeTab">
         <div class="wallet-card">
-          <div>AVAILABLE NAIRA BALANCE</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>AVAILABLE NAIRA BALANCE</div>
+            <div id="userGreeting" style="font-size:12px; opacity:0.9;"></div>
+          </div>
           <div class="balance-amount" id="walletBalance">₦0.00</div>
           <div class="action-grid">
             <button type="button" class="action-btn" id="depositBtn" onclick="openDeposit()">Deposit</button>
@@ -59,11 +65,11 @@
       <div id="earnTab" class="hidden">
         <div class="card">
           <div class="card-title">
-            <span>CPA &amp; Partner Offers</span>
-            <span class="badge-live">Live Monetization</span>
+            <span>Follow &amp; Earn Tasks</span>
+            <span class="badge-live">Live Rewards</span>
           </div>
           <p style="font-size:13px; color:var(--muted); line-height:1.5; margin-top:0;">
-            Connect your CPALead, AdGate Media, or AyeT-Studios Offerwall URL here so completed tasks credit automatically.
+            Tap <strong>Open</strong> to follow our social pages, then tap <strong>Claim Reward</strong> to credit your Naira balance.
           </p>
           <div id="earn-tasks-list"></div>
         </div>
@@ -156,393 +162,6 @@
     </button>
   </nav>
 
-  <script>
-    let resolvedAccountName = '';
-    let authMode = 'signin';
-
-    function setAuthMode(mode) {
-      authMode = mode === 'signup' ? 'signup' : 'signin';
-      const heading = document.getElementById('authHeading');
-      const subtext = document.getElementById('authSubtext');
-      const nameGroup = document.getElementById('authNameGroup');
-      const submitBtn = document.getElementById('authSubmitBtn');
-      const signInBtn = document.getElementById('modeSignInBtn');
-      const signUpBtn = document.getElementById('modeSignUpBtn');
-
-      if (authMode === 'signup') {
-        if (heading) heading.textContent = 'Create NairaFly Account';
-        if (subtext) subtext.textContent = 'Create your account to start claiming task rewards and managing your Naira wallet.';
-        if (nameGroup) nameGroup.classList.remove('hidden');
-        if (submitBtn) submitBtn.textContent = 'Create Account & Continue';
-        if (signUpBtn) {
-          signUpBtn.style.background = 'var(--emerald)';
-          signUpBtn.style.color = '#fff';
-          signUpBtn.style.border = 'none';
-        }
-        if (signInBtn) {
-          signInBtn.style.background = 'var(--bg)';
-          signInBtn.style.color = 'var(--text)';
-          signInBtn.style.border = '1px solid var(--border)';
-        }
-      } else {
-        if (heading) heading.textContent = 'Sign In to NairaFly';
-        if (subtext) subtext.textContent = 'Sign in with your email to access your wallet, claim rewards, and withdraw Naira.';
-        if (nameGroup) nameGroup.classList.add('hidden');
-        if (submitBtn) submitBtn.textContent = 'Continue to Dashboard';
-        if (signInBtn) {
-          signInBtn.style.background = 'var(--emerald)';
-          signInBtn.style.color = '#fff';
-          signInBtn.style.border = 'none';
-        }
-        if (signUpBtn) {
-          signUpBtn.style.background = 'var(--bg)';
-          signUpBtn.style.color = 'var(--text)';
-          signUpBtn.style.border = '1px solid var(--border)';
-        }
-      }
-    }
-
-    function applyAuthGate() {
-      const authView = document.getElementById('authView');
-      const mainView = document.getElementById('mainView');
-      const email = getCurrentUserEmail();
-
-      if (email) {
-        if (authView) authView.classList.add('hidden');
-        if (mainView) mainView.classList.remove('hidden');
-      } else {
-        if (authView) authView.classList.remove('hidden');
-        if (mainView) mainView.classList.add('hidden');
-      }
-    }
-
-    async function handleAuthSubmit(e) {
-      e.preventDefault();
-      const emailInput = document.getElementById('authEmail');
-      const nameInput = document.getElementById('authName');
-      const email = (emailInput?.value || '').trim().toLowerCase();
-      if (!email) return;
-
-      const fullName =
-        (nameInput?.value || '').trim() ||
-        email.split('@')[0] ||
-        'NairaFly User';
-      const referralCode = 'NF' + Math.random().toString(36).substring(2, 8).toUpperCase();
-
-      localStorage.setItem('userEmail', email);
-      localStorage.setItem('nairafly_email', email);
-      localStorage.setItem('nf_user', JSON.stringify({ full_name: fullName, email, referral_code: referralCode }));
-
-      if (window.state && typeof window.state === 'object') {
-        window.state.email = email;
-        window.state.user = { full_name: fullName, email, referral_code: referralCode };
-      }
-
-      try {
-        await fetch('/api/wallet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'upsert_user',
-            email,
-            full_name: fullName,
-            referral_code: referralCode
-          })
-        });
-      } catch (_) {}
-
-      applyAuthGate();
-      switchTab('homeTab');
-      loadEarnTasks(email);
-      if (typeof window.syncWalletFromBackend === 'function') {
-        window.syncWalletFromBackend();
-      }
-      if (typeof window.renderDashboard === 'function') {
-        window.renderDashboard();
-      }
-    }
-
-    function getCurrentUserEmail() {
-      if (window.state && window.state.email) return window.state.email.trim();
-      if (window.state && window.state.user && window.state.user.email) return window.state.user.email.trim();
-      if (window.currentUser && window.currentUser.email) return window.currentUser.email.trim();
-      const savedEmail = localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
-      if (savedEmail) return savedEmail.trim();
-      const emailInput = document.getElementById('authEmail') || document.querySelector('input[type="email"]');
-      if (emailInput && emailInput.value) return emailInput.value.trim();
-      return '';
-    }
-
-    function switchTab(tabName) {
-      applyAuthGate();
-      const homeTab = document.getElementById('homeTab');
-      const earnTab = document.getElementById('earnTab');
-      const navHome = document.getElementById('navHome');
-      const navEarn = document.getElementById('navEarn');
-
-      if (homeTab) homeTab.classList.toggle('hidden', tabName !== 'homeTab');
-      if (earnTab) earnTab.classList.toggle('hidden', tabName !== 'earnTab');
-      if (navHome) navHome.classList.toggle('active', tabName === 'homeTab');
-      if (navEarn) navEarn.classList.toggle('active', tabName === 'earnTab');
-
-      if (tabName === 'earnTab') {
-        loadEarnTasks();
-      }
-    }
-
-    function openDeposit() {
-      const email = getCurrentUserEmail();
-      const input = document.getElementById('depositEmail');
-      if (input && email) input.value = email;
-      document.getElementById('depositSheet')?.classList.remove('hidden');
-    }
-
-    function openWithdraw() {
-      const email = getCurrentUserEmail();
-      const input = document.getElementById('withdrawEmail');
-      if (input && email) input.value = email;
-      document.getElementById('withdrawSheet')?.classList.remove('hidden');
-    }
-
-    function closeAllSheets() {
-      document.getElementById('depositSheet')?.classList.add('hidden');
-      document.getElementById('withdrawSheet')?.classList.add('hidden');
-    }
-
-    function closeSheets(event) {
-      if (event.target.classList.contains('sheet-backdrop')) {
-        closeAllSheets();
-      }
-    }
-
-    function handleWithdrawAccountInput() {
-      const accInput = document.getElementById('withdrawAccountNumber');
-      const countEl = document.getElementById('withdrawDigitCount');
-      if (!accInput) return;
-      accInput.value = accInput.value.replace(/\D/g, '').slice(0, 10);
-      if (countEl) countEl.textContent = `${accInput.value.length}/10`;
-      verifyWithdrawAccount();
-    }
-
-    async function verifyWithdrawAccount() {
-      const bankCode = document.getElementById('withdrawBankCode')?.value || '';
-      const accountNumber = (document.getElementById('withdrawAccountNumber')?.value || '').trim();
-      const statusEl = document.getElementById('withdrawAccountStatus');
-      resolvedAccountName = '';
-
-      if (!statusEl) return;
-
-      if (accountNumber.length < 10 || !bankCode) {
-        statusEl.className = 'hidden';
-        statusEl.textContent = '';
-        return;
-      }
-
-      statusEl.className = 'verified-box';
-      statusEl.textContent = 'Verifying 10-digit account...';
-
-      try {
-        const params = new URLSearchParams({
-          account_number: accountNumber,
-          bank_code: bankCode
-        });
-        const res = await fetch(`/api/resolve-account?${params.toString()}`);
-        const data = await res.json();
-
-        const accountName = data.account_name || data.data?.account_name || '';
-        if (res.ok && accountName) {
-          resolvedAccountName = accountName;
-          statusEl.className = 'verified-box';
-          statusEl.innerHTML = `✓ Verified Account: <strong>${accountName}</strong>`;
-        } else {
-          statusEl.className = 'error-box';
-          statusEl.textContent = data.message || 'Could not verify account number.';
-        }
-      } catch (err) {
-        statusEl.className = 'error-box';
-        statusEl.textContent = 'Error verifying account details.';
-      }
-    }
-
-    async function submitDeposit() {
-      const email = (document.getElementById('depositEmail')?.value || getCurrentUserEmail() || '').trim();
-      const amountNgn = Number(document.getElementById('depositAmount')?.value || 0);
-      if (!email || !amountNgn || amountNgn <= 0) {
-        alert('Enter a valid email and deposit amount.');
-        return;
-      }
-
-      const btn = document.getElementById('submitDepositBtn');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Processing...';
-      }
-
-      try {
-        const res = await fetch('/api/init-deposit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, amount_ngn: amountNgn, amount_kobo: Math.round(amountNgn * 100) })
-        });
-        const data = await res.json();
-        if (data.authorization_url) {
-          window.location.href = data.authorization_url;
-          return;
-        }
-        alert(data.message || 'Deposit request sent.');
-        closeAllSheets();
-      } catch (err) {
-        alert('Could not start deposit right now.');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Continue to Deposit';
-        }
-      }
-    }
-
-    async function submitWithdraw() {
-      const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim();
-      const bankSelect = document.getElementById('withdrawBankCode');
-      const bankCode = bankSelect?.value || '';
-      const bankName = bankSelect && bankSelect.selectedIndex > 0 ? bankSelect.options[bankSelect.selectedIndex].text : '';
-      const accountNumber = (document.getElementById('withdrawAccountNumber')?.value || '').trim();
-      const amountNgn = Number(document.getElementById('withdrawAmount')?.value || 0);
-
-      if (!email || !bankCode || accountNumber.length !== 10 || !amountNgn || amountNgn <= 0) {
-        alert('Please enter your email, bank, 10-digit account number, and valid amount.');
-        return;
-      }
-
-      if (!resolvedAccountName) {
-        await verifyWithdrawAccount();
-      }
-
-      const btn = document.getElementById('submitWithdrawBtn');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Submitting...';
-      }
-
-      try {
-        const res = await fetch('/api/wallet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'withdraw',
-            email,
-            bank_code: bankCode,
-            bank_name: bankName,
-            account_number: accountNumber,
-            account_name: resolvedAccountName,
-            amount_ngn: amountNgn,
-            amount_kobo: Math.round(amountNgn * 100)
-          })
-        });
-        const data = await res.json();
-        alert(data.message || (res.ok ? 'Withdrawal request submitted.' : 'Could not process withdrawal.'));
-        if (res.ok) {
-          resolvedAccountName = '';
-          closeAllSheets();
-        }
-      } catch (err) {
-        alert('Could not process withdrawal right now.');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Request Withdrawal';
-        }
-      }
-    }
-
-    async function loadEarnTasks(userEmail) {
-      const container = document.getElementById('earn-tasks-list');
-      if (!container) return;
-
-      try {
-        const res = await fetch('/api/tasks');
-        const data = await res.json();
-
-        if (!data.status || !Array.isArray(data.tasks)) {
-          container.innerHTML = '<p style="font-size:13px; color:var(--muted);">Could not load tasks right now.</p>';
-          return;
-        }
-
-        container.innerHTML = '';
-
-        data.tasks.forEach((task) => {
-          const card = document.createElement('div');
-          card.className = 'task-card';
-          card.innerHTML = `
-            <div>
-              <div class="task-title">${task.title}</div>
-              <div class="task-reward">+₦${Number(task.reward_ngn).toFixed(2)}</div>
-            </div>
-            <div class="task-actions">
-              <a href="${task.url}" target="_blank" rel="noopener noreferrer">Open</a>
-              <button type="button" data-task-id="${task.id}">Claim Reward</button>
-            </div>
-          `;
-
-          const claimBtn = card.querySelector('button');
-          claimBtn.addEventListener('click', async () => {
-            const activeEmail = (userEmail || getCurrentUserEmail() || '').trim();
-            if (!activeEmail) {
-              alert('Please sign in or enter your email first.');
-              return;
-            }
-
-            claimBtn.disabled = true;
-            claimBtn.textContent = 'Claiming...';
-
-            try {
-              const claimRes = await fetch('/api/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: activeEmail,
-                  task_id: task.id
-                })
-              });
-              const claimData = await claimRes.json();
-
-              if (!claimRes.ok || !claimData.status) {
-                alert(claimData.message || 'Could not claim task.');
-                claimBtn.disabled = false;
-                claimBtn.textContent = 'Claim Reward';
-                return;
-              }
-
-              claimBtn.textContent = 'Claimed';
-              const balanceEl = document.getElementById('walletBalance');
-              if (balanceEl && typeof claimData.balance_kobo === 'number') {
-                balanceEl.textContent = `₦${(claimData.balance_kobo / 100).toFixed(2)}`;
-              }
-              if (typeof window.renderDashboard === 'function') {
-                window.renderDashboard();
-              }
-            } catch (err) {
-              alert('Network error while claiming task.');
-              claimBtn.disabled = false;
-              claimBtn.textContent = 'Claim Reward';
-            }
-          });
-
-          container.appendChild(card);
-        });
-      } catch (err) {
-        container.innerHTML = '<p style="font-size:13px; color:var(--muted);">Error loading tasks.</p>';
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const authForm = document.getElementById('authForm');
-      if (authForm) {
-        authForm.addEventListener('submit', handleAuthSubmit);
-      }
-      applyAuthGate();
-      loadEarnTasks();
-    });
-  </script>
+  <script src="./js/app.js"></script>
 </body>
 </html>

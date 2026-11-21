@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
 const TASKS = {
-  ig_follow: {
-    id: 'ig_follow',
-    title: 'Follow our X page',
+  x_follow: {
+    id: 'x_follow',
+    title: 'Follow our X page (@godswilleva)',
     rewardKobo: 1500, // ₦15
     url: 'https://x.com/godswilleva'
   },
   tiktok_follow: {
     id: 'tiktok_follow',
-    title: 'Follow our TikTok page',
+    title: 'Follow our TikTok page (@itzskiv0id)',
     rewardKobo: 10000, // ₦100
     url: 'https://tiktok.com/@itzskiv0id'
   },
@@ -36,10 +36,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ status: false, message: 'Method not allowed' });
   }
 
-  const { email, task_id, proof_note, full_name } = req.body || {};
+  const { email, task_id, proof_note } = req.body || {};
   const cleanEmail = String(email || '').trim().toLowerCase();
-  const lookupKey = task_id === 'X_follow' ? 'ig_follow' : task_id;
-  const task = TASKS[lookupKey];
+  const normalizedId = task_id === 'ig_follow' || task_id === 'X_follow' ? 'x_follow' : task_id;
+  const task = TASKS[normalizedId];
 
   if (!cleanEmail) {
     return res.status(400).json({ status: false, message: 'Email is required.' });
@@ -48,11 +48,6 @@ export default async function handler(req, res) {
   if (!task) {
     return res.status(400).json({ status: false, message: 'Invalid task.' });
   }
-
-  const fallbackName =
-    (full_name && String(full_name).trim()) ||
-    cleanEmail.split('@')[0] ||
-    'NairaFly User';
 
   const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -63,8 +58,7 @@ export default async function handler(req, res) {
     p_email: cleanEmail,
     p_task_id: task.id,
     p_reward_kobo: task.rewardKobo,
-    p_proof_note: proof_note ? String(proof_note).slice(0, 200) : null,
-    p_full_name: fallbackName
+    p_proof_note: proof_note ? String(proof_note).slice(0, 200) : null
   });
 
   if (error) {
