@@ -76,6 +76,44 @@
       <button type="button" class="primary-btn" id="submitWithdrawBtn" onclick="submitWithdraw()">Request Withdrawal</button>
     </div>
   </div>
+<!-- WITHDRAW SHEET -->
+  <div id="withdrawSheet" class="sheet-backdrop hidden" onclick="closeSheets(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="card-title">
+        <span>Withdraw Naira</span>
+        <button type="button" onclick="closeAllSheets()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="withdrawEmail">Email Address</label>
+        <input type="email" id="withdrawEmail" placeholder="you@example.com" />
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="withdrawBankCode">Bank</label>
+        <select id="withdrawBankCode" onchange="verifyWithdrawAccount()">
+          <option value="">Select bank</option>
+          <option value="044">Access Bank</option>
+          <option value="058">GTBank</option>
+          <option value="033">UBA</option>
+          <option value="057">Zenith Bank</option>
+          <option value="011">First Bank</option>
+          <option value="999992">Opay</option>
+          <option value="999991">PalmPay</option>
+          <option value="50515">Moniepoint</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="withdrawAccountNumber">Account Number</label>
+        <input type="text" id="withdrawAccountNumber" maxlength="10" inputmode="numeric" placeholder="0123456789" oninput="verifyWithdrawAccount()" />
+      </div>
+      <div id="withdrawAccountStatus" class="hidden"></div>
+      <div class="input-group">
+        <label class="input-label" for="withdrawAmount">Amount (NGN)</label>
+        <input type="number" id="withdrawAmount" min="100" step="100" placeholder="1000" />
+      </div>
+      <button type="button" class="primary-btn" id="submitWithdrawBtn" onclick="submitWithdraw()">Request Withdrawal</button>
+    </div>
+  </div>
+
 
   <!-- BOTTOM NAVIGATION -->
   <nav class="bottom-nav" aria-label="Bottom Navigation">
