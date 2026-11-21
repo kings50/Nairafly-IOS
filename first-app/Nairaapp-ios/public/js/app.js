@@ -39,20 +39,23 @@ function isAppleIOS() {
 
 function initPlatformGate() {
   const lock = document.getElementById('iosLockScreen');
+  if (!lock) return;
   if (!isAppleIOS() && sessionStorage.getItem('nf_ios_sim') !== '1') {
     lock.classList.remove('hidden');
   } else {
     lock.classList.add('hidden');
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-    if (!isStandalone) {
-      document.getElementById('safariInstallBanner').classList.remove('hidden');
+    const banner = document.getElementById('safariInstallBanner');
+    if (!isStandalone && banner) {
+      banner.classList.remove('hidden');
     }
   }
 }
 
 function enableSimulatorPreview() {
   sessionStorage.setItem('nf_ios_sim', '1');
-  document.getElementById('iosLockScreen').classList.add('hidden');
+  const lock = document.getElementById('iosLockScreen');
+  if (lock) lock.classList.add('hidden');
   showToast('iOS Simulator Preview Enabled');
 }
 
@@ -63,25 +66,41 @@ function formatNaira(amount) {
 
 function showToast(msg) {
   const el = document.getElementById('toast');
+  if (!el) {
+    alert(msg);
+    return;
+  }
   el.textContent = msg;
   el.classList.remove('hidden');
   clearTimeout(window._toastTimer);
   window._toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
 }
 
+function getCurrentUserEmail() {
+  if (state.user && state.user.email) return state.user.email.trim();
+  const emailInput = document.querySelector('input[type="email"]');
+  if (emailInput && emailInput.value) return emailInput.value.trim();
+  return localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+}
+
 function populateBankSelects() {
-  ['withdrawBank', 'profileBank'].forEach((id) => {
+  ['withdrawBankCode', 'withdrawBank', 'profileBank'].forEach((id) => {
     const sel = document.getElementById(id);
     if (!sel) return;
-    sel.innerHTML = NIGERIAN_BANKS.map((b) => `<option value="${b.code}">${b.name}</option>`).join('');
+    sel.innerHTML =
+      '<option value="">Select bank</option>' +
+      NIGERIAN_BANKS.map((b) => `<option value="${b.code}">${b.name}</option>`).join('');
   });
 }
 
 // 3. Real NUBAN 10-Digit Account Name Verification via /api/resolve-account
 async function verifyNubanAccount(accountNumber, bankCode, statusElId, onVerified) {
   const box = document.getElementById(statusElId);
-  if (accountNumber.length !== 10) {
+  if (!box) return;
+
+  if (accountNumber.length !== 10 || !bankCode) {
     box.className = 'hidden';
+    box.textContent = '';
     onVerified('');
     return;
   }
@@ -90,13 +109,18 @@ async function verifyNubanAccount(accountNumber, bankCode, statusElId, onVerifie
   box.textContent = 'Verifying 10-digit NUBAN with bank...';
 
   try {
-    const res = await fetch(`/api/resolve-account?account_number=${accountNumber}&bank_code=${bankCode}`);
+    const params = new URLSearchParams({
+      account_number: accountNumber,
+      bank_code: bankCode
+    });
+    const res = await fetch(`/api/resolve-account?${params.toString()}`);
     const data = await res.json();
+    const accountName = data.account_name || data.data?.account_name || '';
 
-    if (data.status && data.account_name) {
+    if (res.ok && data.status && accountName) {
       box.className = 'verified-box';
-      box.innerHTML = `✓ Verified Account: <strong>${data.account_name}</strong>`;
-      onVerified(data.account_name);
+      box.innerHTML = `✓ Verified Account: <strong>${accountName}</strong>`;
+      onVerified(accountName);
     } else {
       box.className = 'error-box';
       box.textContent = data.message || 'Unable to verify account name.';
@@ -109,25 +133,54 @@ async function verifyNubanAccount(accountNumber, bankCode, statusElId, onVerifie
   }
 }
 
+async function verifyWithdrawAccount() {
+  const bankCode = document.getElementById('withdrawBankCode')?.value || '';
+  const accountNumber = (document.getElementById('withdrawAccountNumber')?.value || '').trim();
+  const submitBtn = document.getElementById('submitWithdrawBtn');
+  if (submitBtn) submitBtn.disabled = true;
+
+  await verifyNubanAccount(accountNumber, bankCode, 'withdrawAccountStatus', (name) => {
+    state.verifiedWithdrawName = name;
+    if (submitBtn) submitBtn.disabled = !name;
+  });
+}
+
+function handleWithdrawAccountInput() {
+  const accInput = document.getElementById('withdrawAccountNumber');
+  const countEl = document.getElementById('withdrawDigitCount');
+  if (!accInput) return;
+  accInput.value = accInput.value.replace(/\D/g, '').slice(0, 10);
+  if (countEl) countEl.textContent = `${accInput.value.length}/10`;
+  verifyWithdrawAccount();
+}
+
 // 4. Real Paystack Checkout Deposit via /api/init-deposit
-async function startPaystackDeposit() {
-  const amount = Number(document.getElementById('depositAmount').value);
+async function submitDeposit() {
+  const email = (document.getElementById('depositEmail')?.value || getCurrentUserEmail() || '').trim();
+  const amount = Number(document.getElementById('depositAmount')?.value || 0);
+  if (!email) {
+    showToast('Enter a valid email address.');
+    return;
+  }
   if (!amount || amount < 100) {
     showToast('Enter at least ₦100 to deposit.');
     return;
   }
 
-  const btn = document.getElementById('depositSubmitBtn');
-  btn.disabled = true;
-  btn.textContent = 'Connecting to Paystack...';
+  const btn = document.getElementById('submitDepositBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Connecting to Paystack...';
+  }
 
   try {
     const res = await fetch('/api/init-deposit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: state.user.email,
+        email,
         amount_ngn: amount,
+        amount_kobo: Math.round(amount * 100),
         purpose: 'wallet_deposit'
       })
     });
@@ -135,15 +188,16 @@ async function startPaystackDeposit() {
     const data = await res.json();
     if (data.status && data.authorization_url) {
       window.location.href = data.authorization_url;
-    } else {
-      showToast(data.message || 'Set PAYSTACK_SECRET_KEY in Vercel first.');
-      btn.disabled = false;
-      btn.textContent = 'Proceed to Paystack Checkout';
+      return;
     }
+    showToast(data.message || 'Set PAYSTACK_SECRET_KEY in Vercel first.');
   } catch (e) {
     showToast('Backend not reachable. Deploy to Vercel to process real NGN.');
-    btn.disabled = false;
-    btn.textContent = 'Proceed to Paystack Checkout';
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Continue to Deposit';
+    }
   }
 }
 
@@ -158,16 +212,17 @@ async function checkPaystackCallback() {
     const res = await fetch(`/api/verify-payment?reference=${encodeURIComponent(reference)}`);
     const data = await res.json();
     if (data.status) {
-      state.balanceNgn += Number(data.amount_ngn || 0);
+      const creditedNgn = Number(data.amount_ngn || 0);
+      state.balanceNgn += creditedNgn;
       localStorage.setItem('nf_balance', String(state.balanceNgn));
       state.transactions.unshift({
         description: `Paystack Deposit (${reference})`,
-        amount_kobo: Math.round(data.amount_ngn * 100),
+        amount_kobo: Math.round(creditedNgn * 100),
         status: 'success',
         created_at: new Date().toISOString()
       });
       localStorage.setItem('nf_txs', JSON.stringify(state.transactions));
-      showToast(`Deposit successful! +${formatNaira(data.amount_ngn)}`);
+      showToast(`Deposit successful! +${formatNaira(creditedNgn)}`);
       await syncWalletFromBackend();
     } else {
       showToast(data.message || 'Payment verification failed.');
@@ -182,9 +237,11 @@ async function checkPaystackCallback() {
 
 // 6. Sync Wallet with Supabase via /api/wallet
 async function syncWalletFromBackend() {
-  if (!state.user || !state.user.email) return;
+  const email = getCurrentUserEmail();
+  if (!email) return;
+
   try {
-    const res = await fetch(`/api/wallet?email=${encodeURIComponent(state.user.email)}`);
+    const res = await fetch(`/api/wallet?email=${encodeURIComponent(email)}`);
     const data = await res.json();
     if (data.status && data.wallet) {
       state.backendLive = true;
@@ -197,10 +254,12 @@ async function syncWalletFromBackend() {
           account_number: data.wallet.account_number,
           account_name: data.wallet.account_name
         };
+        localStorage.setItem('nf_bank', JSON.stringify(state.savedBank));
       }
       localStorage.setItem('nf_balance', String(state.balanceNgn));
       localStorage.setItem('nf_txs', JSON.stringify(state.transactions));
-      document.getElementById('connectionBadge').textContent = '● Live Paystack + Supabase';
+      const badge = document.getElementById('connectionBadge');
+      if (badge) badge.textContent = '● Live Paystack + Supabase';
     }
   } catch (_) {
     // Fallback to local state if env vars are not yet added
@@ -210,12 +269,13 @@ async function syncWalletFromBackend() {
 
 async function handleLogin(e) {
   e.preventDefault();
-  const fullName = document.getElementById('authName').value.trim() || 'NairaFly User';
-  const email = document.getElementById('authEmail').value.trim().toLowerCase();
+  const fullName = document.getElementById('authName')?.value.trim() || 'NairaFly User';
+  const email = document.getElementById('authEmail')?.value.trim().toLowerCase() || '';
   if (!email) return;
 
   state.user = { full_name: fullName, email };
   localStorage.setItem('nf_user', JSON.stringify(state.user));
+  localStorage.setItem('userEmail', email);
 
   try {
     await fetch('/api/wallet', {
@@ -229,24 +289,43 @@ async function handleLogin(e) {
   await syncWalletFromBackend();
 }
 
-async function submitWithdrawal() {
-  const amount = Number(document.getElementById('withdrawAmount').value);
-  const bankSelect = document.getElementById('withdrawBank');
-  const bankCode = bankSelect.value;
-  const bankName = bankSelect.options[bankSelect.selectedIndex].text;
-  const accountNumber = document.getElementById('withdrawAccount').value.trim();
+// 7. Withdrawal Submission with Verified Bank Account
+async function submitWithdraw() {
+  const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim();
+  const bankSelect = document.getElementById('withdrawBankCode');
+  const bankCode = bankSelect?.value || '';
+  const bankName = bankSelect && bankSelect.selectedIndex > 0 ? bankSelect.options[bankSelect.selectedIndex].text : '';
+  const accountNumber = (document.getElementById('withdrawAccountNumber')?.value || '').trim();
+  const amount = Number(document.getElementById('withdrawAmount')?.value || 0);
 
-  if (!state.verifiedWithdrawName) {
-    showToast('Please verify a 10-digit account number first.');
+  if (!email || !bankCode || accountNumber.length !== 10) {
+    showToast('Select a bank and enter a 10-digit account number.');
     return;
   }
+
+  if (!state.verifiedWithdrawName) {
+    await verifyWithdrawAccount();
+  }
+
+  if (!state.verifiedWithdrawName) {
+    showToast('Please verify a valid 10-digit account number first.');
+    return;
+  }
+
   if (!amount || amount < 500) {
     showToast('Minimum withdrawal is ₦500.');
     return;
   }
+
   if (amount > state.balanceNgn) {
     showToast('Insufficient Naira balance.');
     return;
+  }
+
+  const btn = document.getElementById('submitWithdrawBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
   }
 
   try {
@@ -255,8 +334,9 @@ async function submitWithdrawal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'request_withdrawal',
-        email: state.user.email,
+        email,
         amount_ngn: amount,
+        amount_kobo: Math.round(amount * 100),
         bank_code: bankCode,
         bank_name: bankName,
         account_number: accountNumber,
@@ -264,34 +344,42 @@ async function submitWithdrawal() {
       })
     });
     const data = await res.json();
-    if (data.status) {
+    if (res.ok && data.status) {
       showToast(`Payout queued to ${state.verifiedWithdrawName}`);
-      closeSheet('withdrawSheet');
+      state.verifiedWithdrawName = '';
+      closeAllSheets();
       await syncWalletFromBackend();
       return;
     }
-  } catch (_) {}
-
-  // Local fallback update
-  state.balanceNgn -= amount;
-  localStorage.setItem('nf_balance', String(state.balanceNgn));
-  state.transactions.unshift({
-    description: `Payout to ${state.verifiedWithdrawName} (${bankName})`,
-    amount_kobo: -Math.round(amount * 100),
-    status: 'pending',
-    created_at: new Date().toISOString()
-  });
-  localStorage.setItem('nf_txs', JSON.stringify(state.transactions));
-  closeSheet('withdrawSheet');
-  renderDashboard();
-  showToast(`Withdrawal queued for ${state.verifiedWithdrawName}`);
+    showToast(data.message || 'Could not process withdrawal.');
+  } catch (_) {
+    // Local fallback update when backend isn't reachable
+    state.balanceNgn -= amount;
+    localStorage.setItem('nf_balance', String(state.balanceNgn));
+    state.transactions.unshift({
+      description: `Payout to ${state.verifiedWithdrawName} (${bankName})`,
+      amount_kobo: -Math.round(amount * 100),
+      status: 'pending',
+      created_at: new Date().toISOString()
+    });
+    localStorage.setItem('nf_txs', JSON.stringify(state.transactions));
+    state.verifiedWithdrawName = '';
+    closeAllSheets();
+    renderDashboard();
+    showToast(`Withdrawal queued for ${state.verifiedWithdrawName}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Request Withdrawal';
+    }
+  }
 }
 
 async function savePayoutBank() {
   const bankSelect = document.getElementById('profileBank');
-  const bankCode = bankSelect.value;
-  const bankName = bankSelect.options[bankSelect.selectedIndex].text;
-  const accountNumber = document.getElementById('profileAccount').value.trim();
+  const bankCode = bankSelect?.value || '';
+  const bankName = bankSelect && bankSelect.selectedIndex >= 0 ? bankSelect.options[bankSelect.selectedIndex].text : '';
+  const accountNumber = (document.getElementById('profileAccount')?.value || '').trim();
 
   if (!state.verifiedProfileName) {
     showToast('Enter a valid 10-digit account number to verify first.');
@@ -312,7 +400,7 @@ async function savePayoutBank() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'save_bank',
-        email: state.user.email,
+        email: getCurrentUserEmail(),
         ...state.savedBank
       })
     });
@@ -322,34 +410,126 @@ async function savePayoutBank() {
   renderDashboard();
 }
 
-function renderDashboard() {
-  if (!state.user) return;
-  document.getElementById('userGreeting').textContent = `Hi, ${state.user.full_name}`;
-  document.getElementById('walletBalance').textContent = state.hideBalance ? '₦ ••••••' : formatNaira(state.balanceNgn);
+// 8. Earn Tasks Loader & Claim Flow (/api/tasks)
+async function loadEarnTasks(userEmail) {
+  const container = document.getElementById('earn-tasks-list');
+  if (!container) return;
 
-  const txList = document.getElementById('txList');
-  if (!state.transactions.length) {
-    txList.innerHTML = `<div style="color: var(--muted); font-size: 13px; padding: 8px 0;">No transactions yet. Tap Deposit to fund via Paystack.</div>`;
-  } else {
-    txList.innerHTML = state.transactions.slice(0, 10).map((tx) => {
-      const ngn = Number(tx.amount_kobo || 0) / 100;
-      const isCredit = ngn >= 0;
-      return `
-        <div class="tx-item">
-          <div>
-            <div style="font-weight:700;">${tx.description || 'Transaction'}</div>
-            <div style="font-size:11px; color:var(--muted);">${tx.status.toUpperCase()}</div>
-          </div>
-          <div style="font-weight:800; color:${isCredit ? '#10B981' : '#EF4444'};">
-            ${isCredit ? '+' : ''}${formatNaira(ngn)}
-          </div>
+  try {
+    const res = await fetch('/api/tasks');
+    const data = await res.json();
+
+    if (!data.status || !Array.isArray(data.tasks)) {
+      container.innerHTML = '<p style="font-size:13px; color:var(--muted);">Could not load tasks right now.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+
+    data.tasks.forEach((task) => {
+      const card = document.createElement('div');
+      card.className = 'task-card';
+      card.innerHTML = `
+        <div>
+          <div class="task-title">${task.title}</div>
+          <div class="task-reward">+₦${Number(task.reward_ngn).toFixed(2)}</div>
+        </div>
+        <div class="task-actions">
+          <a href="${task.url}" target="_blank" rel="noopener noreferrer">Open</a>
+          <button type="button" data-task-id="${task.id}">Claim Reward</button>
         </div>
       `;
-    }).join('');
+
+      const claimBtn = card.querySelector('button');
+      claimBtn.addEventListener('click', async () => {
+        const activeEmail = (userEmail || getCurrentUserEmail() || '').trim();
+        if (!activeEmail) {
+          showToast('Please sign in or enter your email first.');
+          return;
+        }
+
+        claimBtn.disabled = true;
+        claimBtn.textContent = 'Claiming...';
+
+        try {
+          const claimRes = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: activeEmail,
+              task_id: task.id
+            })
+          });
+          const claimData = await claimRes.json();
+
+          if (!claimRes.ok || !claimData.status) {
+            showToast(claimData.message || 'Could not claim task.');
+            claimBtn.disabled = false;
+            claimBtn.textContent = 'Claim Reward';
+            return;
+          }
+
+          claimBtn.textContent = 'Claimed';
+          if (typeof claimData.balance_kobo === 'number') {
+            state.balanceNgn = claimData.balance_kobo / 100;
+            localStorage.setItem('nf_balance', String(state.balanceNgn));
+          } else if (task.reward_ngn) {
+            state.balanceNgn += Number(task.reward_ngn);
+            localStorage.setItem('nf_balance', String(state.balanceNgn));
+          }
+          renderDashboard();
+        } catch (err) {
+          showToast('Network error while claiming task.');
+          claimBtn.disabled = false;
+          claimBtn.textContent = 'Claim Reward';
+        }
+      });
+
+      container.appendChild(card);
+    });
+  } catch (err) {
+    container.innerHTML = '<p style="font-size:13px; color:var(--muted);">Error loading tasks.</p>';
+  }
+}
+
+// 9. UI Rendering & Navigation
+function renderDashboard() {
+  const greetingEl = document.getElementById('userGreeting');
+  if (greetingEl && state.user) {
+    greetingEl.textContent = `Hi, ${state.user.full_name}`;
   }
 
-  if (state.savedBank) {
-    document.getElementById('savedBankSummary').textContent =
+  const balanceEl = document.getElementById('walletBalance');
+  if (balanceEl) {
+    balanceEl.textContent = state.hideBalance ? '₦ ••••••' : formatNaira(state.balanceNgn);
+  }
+
+  const txList = document.getElementById('txList');
+  if (txList) {
+    if (!state.transactions.length) {
+      txList.innerHTML = `<div style="color: var(--muted); font-size: 13px; padding: 8px 0;">No transactions yet. Tap Deposit to fund via Paystack.</div>`;
+    } else {
+      txList.innerHTML = state.transactions.slice(0, 10).map((tx) => {
+        const ngn = Number(tx.amount_kobo || 0) / 100;
+        const isCredit = ngn >= 0;
+        return `
+          <div class="tx-item">
+            <div>
+              <div style="font-weight:700;">${tx.description || 'Transaction'}</div>
+              <div style="font-size:11px; color:var(--muted);">${String(tx.status || '').toUpperCase()}</div>
+            </div>
+            <div style="font-weight:800; color:${isCredit ? '#10B981' : '#EF4444'};">
+              ${isCredit ? '+' : ''}${formatNaira(ngn)}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  const savedBankEl = document.getElementById('savedBankSummary');
+  if (savedBankEl && state.savedBank) {
+    savedBankEl.textContent =
       `${state.savedBank.account_name} • ${state.savedBank.bank_name} (${state.savedBank.account_number})`;
   }
 }
@@ -357,6 +537,8 @@ function renderDashboard() {
 function renderApp() {
   const authView = document.getElementById('authView');
   const mainView = document.getElementById('mainView');
+  if (!authView || !mainView) return;
+
   if (!state.user) {
     authView.classList.remove('hidden');
     mainView.classList.add('hidden');
@@ -369,29 +551,68 @@ function renderApp() {
 
 function switchTab(tabName, btn) {
   ['homeTab', 'earnTab', 'referTab', 'profileTab'].forEach((id) => {
-    document.getElementById(id).classList.add('hidden');
+    const tabEl = document.getElementById(id);
+    if (tabEl) tabEl.classList.toggle('hidden', id !== tabName);
   });
-  document.getElementById(tabName).classList.remove('hidden');
-  document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-}
 
-function openSheet(id) {
-  document.getElementById(id).classList.remove('hidden');
-  if (id === 'withdrawSheet' && state.savedBank) {
-    document.getElementById('withdrawBank').value = state.savedBank.bank_code;
-    document.getElementById('withdrawAccount').value = state.savedBank.account_number;
-    document.getElementById('withdrawDigitCount').textContent = `${state.savedBank.account_number.length}/10`;
-    state.verifiedWithdrawName = state.savedBank.account_name;
-    const box = document.getElementById('withdrawVerifyStatus');
-    box.className = 'verified-box';
-    box.innerHTML = `✓ Verified Account: <strong>${state.savedBank.account_name}</strong>`;
-    document.getElementById('withdrawSubmitBtn').disabled = false;
+  document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const navMap = { homeTab: 'navHome', earnTab: 'navEarn' };
+    if (navMap[tabName]) {
+      document.getElementById(navMap[tabName])?.classList.add('active');
+    }
+  }
+
+  if (tabName === 'earnTab') {
+    loadEarnTasks();
   }
 }
 
-function closeSheet(id) {
-  document.getElementById(id).classList.add('hidden');
+function openDeposit() {
+  const email = getCurrentUserEmail();
+  const input = document.getElementById('depositEmail');
+  if (input && email) input.value = email;
+  document.getElementById('depositSheet')?.classList.remove('hidden');
+}
+
+function openWithdraw() {
+  const email = getCurrentUserEmail();
+  const input = document.getElementById('withdrawEmail');
+  if (input && email) input.value = email;
+
+  document.getElementById('withdrawSheet')?.classList.remove('hidden');
+
+  if (state.savedBank) {
+    const bankSel = document.getElementById('withdrawBankCode');
+    const accInput = document.getElementById('withdrawAccountNumber');
+    const countEl = document.getElementById('withdrawDigitCount');
+    const box = document.getElementById('withdrawAccountStatus');
+    const submitBtn = document.getElementById('submitWithdrawBtn');
+
+    if (bankSel) bankSel.value = state.savedBank.bank_code;
+    if (accInput) accInput.value = state.savedBank.account_number;
+    if (countEl) countEl.textContent = `${state.savedBank.account_number.length}/10`;
+    state.verifiedWithdrawName = state.savedBank.account_name;
+
+    if (box) {
+      box.className = 'verified-box';
+      box.innerHTML = `✓ Verified Account: <strong>${state.savedBank.account_name}</strong>`;
+    }
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function closeAllSheets() {
+  document.getElementById('depositSheet')?.classList.add('hidden');
+  document.getElementById('withdrawSheet')?.classList.add('hidden');
+}
+
+function closeSheets(event) {
+  if (event.target && event.target.classList.contains('sheet-backdrop')) {
+    closeAllSheets();
+  }
 }
 
 function logoutUser() {
@@ -404,38 +625,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPlatformGate();
   populateBankSelects();
   renderApp();
+  renderDashboard();
+  loadEarnTasks();
 
-  document.getElementById('authForm').addEventListener('submit', handleLogin);
+  const authForm = document.getElementById('authForm');
+  if (authForm) authForm.addEventListener('submit', handleLogin);
 
-  // Live 10-digit NUBAN verification on Withdraw input
-  const withdrawAcc = document.getElementById('withdrawAccount');
-  const withdrawBank = document.getElementById('withdrawBank');
-  const triggerWithdrawVerify = () => {
-    withdrawAcc.value = withdrawAcc.value.replace(/\D/g, '').slice(0, 10);
-    document.getElementById('withdrawDigitCount').textContent = `${withdrawAcc.value.length}/10`;
-    document.getElementById('withdrawSubmitBtn').disabled = true;
-    verifyNubanAccount(withdrawAcc.value, withdrawBank.value, 'withdrawVerifyStatus', (name) => {
-      state.verifiedWithdrawName = name;
-      document.getElementById('withdrawSubmitBtn').disabled = !name;
-    });
-  };
-  withdrawAcc.addEventListener('input', triggerWithdrawVerify);
-  withdrawBank.addEventListener('change', triggerWithdrawVerify);
+  const withdrawAcc = document.getElementById('withdrawAccountNumber');
+  const withdrawBank = document.getElementById('withdrawBankCode');
+  if (withdrawAcc) withdrawAcc.addEventListener('input', handleWithdrawAccountInput);
+  if (withdrawBank) withdrawBank.addEventListener('change', verifyWithdrawAccount);
 
-  // Live 10-digit NUBAN verification on Profile input
   const profileAcc = document.getElementById('profileAccount');
   const profileBank = document.getElementById('profileBank');
   const triggerProfileVerify = () => {
+    if (!profileAcc || !profileBank) return;
     profileAcc.value = profileAcc.value.replace(/\D/g, '').slice(0, 10);
-    document.getElementById('profileDigitCount').textContent = `${profileAcc.value.length}/10`;
-    document.getElementById('profileSaveBtn').disabled = true;
+    const countEl = document.getElementById('profileDigitCount');
+    const saveBtn = document.getElementById('profileSaveBtn');
+    if (countEl) countEl.textContent = `${profileAcc.value.length}/10`;
+    if (saveBtn) saveBtn.disabled = true;
     verifyNubanAccount(profileAcc.value, profileBank.value, 'profileVerifyStatus', (name) => {
       state.verifiedProfileName = name;
-      document.getElementById('profileSaveBtn').disabled = !name;
+      if (saveBtn) saveBtn.disabled = !name;
     });
   };
-  profileAcc.addEventListener('input', triggerProfileVerify);
-  profileBank.addEventListener('change', triggerProfileVerify);
+  if (profileAcc) profileAcc.addEventListener('input', triggerProfileVerify);
+  if (profileBank) profileBank.addEventListener('change', triggerProfileVerify);
 
   if (state.user) {
     await checkPaystackCallback();

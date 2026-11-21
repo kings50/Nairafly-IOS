@@ -70,24 +70,6 @@
         <input type="email" id="withdrawEmail" placeholder="you@example.com" />
       </div>
       <div class="input-group">
-        <label class="input-label" for="withdrawAmount">Amount (NGN)</label>
-        <input type="number" id="withdrawAmount" min="100" step="100" placeholder="1000" />
-      </div>
-      <button type="button" class="primary-btn" id="submitWithdrawBtn" onclick="submitWithdraw()">Request Withdrawal</button>
-    </div>
-  </div>
-<!-- WITHDRAW SHEET -->
-  <div id="withdrawSheet" class="sheet-backdrop hidden" onclick="closeSheets(event)">
-    <div class="sheet" onclick="event.stopPropagation()">
-      <div class="card-title">
-        <span>Withdraw Naira</span>
-        <button type="button" onclick="closeAllSheets()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;">✕</button>
-      </div>
-      <div class="input-group">
-        <label class="input-label" for="withdrawEmail">Email Address</label>
-        <input type="email" id="withdrawEmail" placeholder="you@example.com" />
-      </div>
-      <div class="input-group">
         <label class="input-label" for="withdrawBankCode">Bank</label>
         <select id="withdrawBankCode" onchange="verifyWithdrawAccount()">
           <option value="">Select bank</option>
@@ -96,14 +78,26 @@
           <option value="033">UBA</option>
           <option value="057">Zenith Bank</option>
           <option value="011">First Bank</option>
-          <option value="999992">Opay</option>
+          <option value="070">Fidelity Bank</option>
+          <option value="50211">Kuda Bank</option>
+          <option value="999992">OPay Digital Services</option>
           <option value="999991">PalmPay</option>
-          <option value="50515">Moniepoint</option>
+          <option value="50515">Moniepoint MFB</option>
         </select>
       </div>
       <div class="input-group">
-        <label class="input-label" for="withdrawAccountNumber">Account Number</label>
-        <input type="text" id="withdrawAccountNumber" maxlength="10" inputmode="numeric" placeholder="0123456789" oninput="verifyWithdrawAccount()" />
+        <label class="input-label" for="withdrawAccountNumber">
+          <span>Account Number</span>
+          <span id="withdrawDigitCount">0/10</span>
+        </label>
+        <input
+          type="text"
+          id="withdrawAccountNumber"
+          maxlength="10"
+          inputmode="numeric"
+          placeholder="0123456789"
+          oninput="handleWithdrawAccountInput()"
+        />
       </div>
       <div id="withdrawAccountStatus" class="hidden"></div>
       <div class="input-group">
@@ -113,7 +107,6 @@
       <button type="button" class="primary-btn" id="submitWithdrawBtn" onclick="submitWithdraw()">Request Withdrawal</button>
     </div>
   </div>
-
 
   <!-- BOTTOM NAVIGATION -->
   <nav class="bottom-nav" aria-label="Bottom Navigation">
@@ -132,8 +125,11 @@
   </nav>
 
   <script>
+    let resolvedAccountName = '';
+
     function getCurrentUserEmail() {
       if (window.state && window.state.email) return window.state.email;
+      if (window.state && window.state.user && window.state.user.email) return window.state.user.email;
       if (window.currentUser && window.currentUser.email) return window.currentUser.email;
       const emailInput = document.querySelector('input[type="email"]');
       if (emailInput && emailInput.value) return emailInput.value.trim();
@@ -181,6 +177,55 @@
       }
     }
 
+    function handleWithdrawAccountInput() {
+      const accInput = document.getElementById('withdrawAccountNumber');
+      const countEl = document.getElementById('withdrawDigitCount');
+      if (!accInput) return;
+      accInput.value = accInput.value.replace(/\D/g, '').slice(0, 10);
+      if (countEl) countEl.textContent = `${accInput.value.length}/10`;
+      verifyWithdrawAccount();
+    }
+
+    async function verifyWithdrawAccount() {
+      const bankCode = document.getElementById('withdrawBankCode')?.value || '';
+      const accountNumber = (document.getElementById('withdrawAccountNumber')?.value || '').trim();
+      const statusEl = document.getElementById('withdrawAccountStatus');
+      resolvedAccountName = '';
+
+      if (!statusEl) return;
+
+      if (accountNumber.length < 10 || !bankCode) {
+        statusEl.className = 'hidden';
+        statusEl.textContent = '';
+        return;
+      }
+
+      statusEl.className = 'verified-box';
+      statusEl.textContent = 'Verifying 10-digit account...';
+
+      try {
+        const params = new URLSearchParams({
+          account_number: accountNumber,
+          bank_code: bankCode
+        });
+        const res = await fetch(`/api/resolve-account?${params.toString()}`);
+        const data = await res.json();
+
+        const accountName = data.account_name || data.data?.account_name || '';
+        if (res.ok && accountName) {
+          resolvedAccountName = accountName;
+          statusEl.className = 'verified-box';
+          statusEl.innerHTML = `✓ Verified Account: <strong>${accountName}</strong>`;
+        } else {
+          statusEl.className = 'error-box';
+          statusEl.textContent = data.message || 'Could not verify account number.';
+        }
+      } catch (err) {
+        statusEl.className = 'error-box';
+        statusEl.textContent = 'Error verifying account details.';
+      }
+    }
+
     async function submitDeposit() {
       const email = (document.getElementById('depositEmail')?.value || getCurrentUserEmail() || '').trim();
       const amountNgn = Number(document.getElementById('depositAmount')?.value || 0);
@@ -220,10 +265,19 @@
 
     async function submitWithdraw() {
       const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim();
+      const bankSelect = document.getElementById('withdrawBankCode');
+      const bankCode = bankSelect?.value || '';
+      const bankName = bankSelect && bankSelect.selectedIndex > 0 ? bankSelect.options[bankSelect.selectedIndex].text : '';
+      const accountNumber = (document.getElementById('withdrawAccountNumber')?.value || '').trim();
       const amountNgn = Number(document.getElementById('withdrawAmount')?.value || 0);
-      if (!email || !amountNgn || amountNgn <= 0) {
-        alert('Enter a valid email and withdrawal amount.');
+
+      if (!email || !bankCode || accountNumber.length !== 10 || !amountNgn || amountNgn <= 0) {
+        alert('Please enter your email, bank, 10-digit account number, and valid amount.');
         return;
+      }
+
+      if (!resolvedAccountName) {
+        await verifyWithdrawAccount();
       }
 
       const btn = document.getElementById('submitWithdrawBtn');
@@ -236,11 +290,23 @@
         const res = await fetch('/api/wallet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'withdraw', email, amount_ngn: amountNgn, amount_kobo: Math.round(amountNgn * 100) })
+          body: JSON.stringify({
+            action: 'withdraw',
+            email,
+            bank_code: bankCode,
+            bank_name: bankName,
+            account_number: accountNumber,
+            account_name: resolvedAccountName,
+            amount_ngn: amountNgn,
+            amount_kobo: Math.round(amountNgn * 100)
+          })
         });
         const data = await res.json();
         alert(data.message || (res.ok ? 'Withdrawal request submitted.' : 'Could not process withdrawal.'));
-        if (res.ok) closeAllSheets();
+        if (res.ok) {
+          resolvedAccountName = '';
+          closeAllSheets();
+        }
       } catch (err) {
         alert('Could not process withdrawal right now.');
       } finally {
