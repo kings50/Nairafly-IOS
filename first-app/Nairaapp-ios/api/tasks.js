@@ -1,17 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 const TASKS = {
-  ig_follow: {
+  X_follow: {
     id: 'ig_follow',
-    title: 'Follow our Instagram page',
+    title: 'Follow our X page',
     rewardKobo: 1500, // ₦15
-    url: 'https://instagram.com/your_handle'
+    url: 'https://X.com/@godswilleva'
   },
   tiktok_follow: {
     id: 'tiktok_follow',
     title: 'Follow our TikTok page',
     rewardKobo: 10000, // ₦100
-    url: 'https://tiktok.com/@your_handle'
+    url: 'https://tiktok.com/@itzskiv0id'
   },
   quick_survey: {
     id: 'quick_survey',
