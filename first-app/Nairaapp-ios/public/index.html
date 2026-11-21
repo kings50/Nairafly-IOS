@@ -2,189 +2,143 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>NairaFly iOS</title>
-
-  <!-- Strictly Apple iOS Web App Meta Tags (Android PWA disabled) -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="NairaFly" />
-  <link rel="apple-touch-icon" href="/icon.svg" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NairaFly</title>
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div id="toast" class="toast hidden"></div>
-
-  <!-- iOS-Exclusive Lock Screen for Android / Desktop -->
-  <div id="iosLockScreen" class="ios-lock-screen hidden">
-    <div style="font-size:52px; margin-bottom:14px;"></div>
-    <h2 style="margin:0 0 10px; font-size:24px;">iOS Exclusive App</h2>
-    <p style="color:#94A3B8; font-size:14px; max-width:320px; line-height:1.5; margin:0 0 22px;">
-      NairaFly is built exclusively for Apple iPhone and iPad Safari. Installation on Android devices is disabled.
-    </p>
-    <button onclick="enableSimulatorPreview()" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#CBD5E1; padding:10px 16px; border-radius:12px; font-size:12px; cursor:pointer;">
-      Preview iOS Simulator Mode
-    </button>
-  </div>
-
   <div class="phone-shell">
-    <!-- iOS Safari Add to Home Screen Banner -->
-    <div id="safariInstallBanner" class="glass-banner hidden">
-      <div>
-        <strong>Install NairaFly on iPhone</strong><br/>
-        <span style="opacity:0.9; font-size:12px;">Tap Safari Share (⍗) → <b>Add to Home Screen</b></span>
-      </div>
-      <button onclick="this.parentElement.classList.add('hidden')" style="background:rgba(255,255,255,0.2); border:none; color:#fff; border-radius:8px; padding:6px 10px; font-weight:700;">✕</button>
-    </div>
-
-    <!-- Auth View -->
-    <div id="authView">
-      <div style="text-align:center; padding: 36px 0 24px;">
-        <div style="width:64px; height:64px; border-radius:18px; background:linear-gradient(135deg,#059669,#064E3B); color:#FBBF24; font-size:32px; font-weight:900; display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">₦</div>
-        <h1 style="margin:0; font-size:26px;">NairaFly iOS</h1>
-        <p style="color:var(--muted); font-size:14px; margin:6px 0 0;">Verified Naira Wallet, Paystack Checkout & Rewards</p>
-      </div>
-
-      <form id="authForm" class="card">
-        <div class="input-group">
-          <label class="input-label"><span>Full Name</span></label>
-          <input id="authName" type="text" placeholder="e.g. Chinedu Okafor" required />
-        </div>
-        <div class="input-group">
-          <label class="input-label"><span>Email Address (for Paystack receipts)</span></label>
-          <input id="authEmail" type="email" placeholder="you@example.com" required />
-        </div>
-        <button type="submit" class="primary-btn">Continue to iOS Wallet</button>
-      </form>
-    </div>
-
-    <!-- Main App View -->
     <div id="mainView" class="hidden">
-      <div class="header-row">
-        <div>
-          <div style="font-size:12px; color:var(--muted);" id="userGreeting">Hi, User</div>
-          <div class="brand-title">NairaFly <span class="badge-live" id="connectionBadge">● Ready for Paystack</span></div>
-        </div>
-        <button onclick="document.body.classList.toggle('dark')" style="background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:12px; padding:8px 11px; font-weight:700; cursor:pointer;">◐</button>
-      </div>
-
       <!-- HOME TAB -->
       <div id="homeTab">
         <div class="wallet-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; opacity:0.88;">
-            <span>AVAILABLE NAIRA BALANCE</span>
-            <span onclick="state.hideBalance = !state.hideBalance; renderDashboard();" style="cursor:pointer;">👁 Toggle</span>
-          </div>
+          <div>AVAILABLE NAIRA BALANCE</div>
           <div class="balance-amount" id="walletBalance">₦0.00</div>
           <div class="action-grid">
-            <button class="action-btn gold" onclick="openSheet('depositSheet')">+ Deposit</button>
-            <button class="action-btn" onclick="openSheet('withdrawSheet')">↗ Withdraw</button>
-            <button class="action-btn" onclick="switchTab('earnTab')">★ Earn</button>
+            <button type="button" onclick="switchTab('earnTab')">Earn</button>
           </div>
         </div>
-
-        <div class="card">
-          <div class="card-title">
-            <span>Recent Ledger Activity</span>
-            <span style="font-size:12px; color:var(--emerald);">NGN</span>
-          </div>
-          <div id="txList"></div>
-        </div>
+        <div id="txList"></div>
       </div>
 
       <!-- EARN TAB -->
       <div id="earnTab" class="hidden">
         <div class="card">
-          <div class="card-title"><span>CPA & Partner Offers</span><span class="badge-live">Live Monetization</span></div>
+          <div class="card-title">
+            <span>CPA &amp; Partner Offers</span>
+            <span class="badge-live">Live Monetization</span>
+          </div>
           <p style="font-size:13px; color:var(--muted); line-height:1.5; margin-top:0;">
-            Connect your CPALead, AdGate Media, or AyeT-Studios Offerwall URL here so completed tasks trigger a server callback to credit users' Supabase wallets automatically.
+            Connect your CPALead, AdGate Media, or AyeT-Studios Offerwall URL here so completed tasks credit automatically.
           </p>
-          <div class="tx-item">
-            <div><strong>Fintech App Signup Offer</strong><div style="font-size:11px; color:var(--muted);">Partner CPA Offerwall</div></div>
-            <span style="font-weight:800; color:var(--emerald);">+₦450.00</span>
-          </div>
-          <div class="tx-item">
-            <div><strong>Daily Consumer Survey</strong><div style="font-size:11px; color:var(--muted);">3 mins • Verified</div></div>
-            <span style="font-weight:800; color:var(--emerald);">+₦200.00</span>
-          </div>
+          <div id="earn-tasks-list"></div>
         </div>
-      </div>
-
-      <!-- REFER TAB -->
-      <div id="referTab" class="hidden">
-        <div class="card">
-          <div class="card-title"><span>Invite & Earn Commission</span></div>
-          <p style="font-size:13px; color:var(--muted); margin-top:0;">
-            Share your Vercel app link with iPhone users. Earn a commission when referred friends fund their wallets or upgrade to VIP.
-          </p>
-          <button class="primary-btn" onclick="navigator.clipboard?.writeText(window.location.origin); showToast('App link copied!');">Copy Invite Link</button>
-        </div>
-      </div>
-
-      <!-- PROFILE TAB -->
-      <div id="profileTab" class="hidden">
-        <div class="card">
-          <div class="card-title"><span>Verified Payout Bank Account</span></div>
-          <div id="savedBankSummary" style="font-size:12px; color:var(--emerald); font-weight:700; margin-bottom:12px;">No default payout account saved yet.</div>
-          <div class="input-group">
-            <label class="input-label"><span>Select Nigerian Bank</span></label>
-            <select id="profileBank"></select>
-          </div>
-          <div class="input-group">
-            <label class="input-label"><span>10-Digit NUBAN Account Number</span><span id="profileDigitCount">0/10</span></label>
-            <input id="profileAccount" type="tel" inputmode="numeric" maxlength="10" placeholder="0123456789" />
-          </div>
-          <div id="profileVerifyStatus" class="hidden"></div>
-          <button id="profileSaveBtn" class="primary-btn" onclick="savePayoutBank()" disabled>Save Verified Account</button>
-        </div>
-
-        <button onclick="logoutUser()" style="width:100%; padding:13px; border-radius:14px; border:1px solid #EF4444; background:transparent; color:#EF4444; font-weight:700; cursor:pointer;">Sign Out</button>
       </div>
     </div>
   </div>
 
-  <!-- Bottom Navigation -->
-  <nav class="bottom-nav">
-    <button class="nav-btn active" onclick="switchTab('homeTab', this)"><span>⌂</span>Wallet</button>
-    <button class="nav-btn" onclick="switchTab('earnTab', this)"><span>★</span>Earn</button>
-    <button class="nav-btn" onclick="switchTab('referTab', this)"><span>⇄</span>Refer</button>
-    <button class="nav-btn" onclick="switchTab('profileTab', this)"><span>⚙</span>Bank & ID</button>
-  </nav>
+  <script>
+    function getCurrentUserEmail() {
+      if (window.state && window.state.email) return window.state.email;
+      if (window.currentUser && window.currentUser.email) return window.currentUser.email;
+      const emailInput = document.querySelector('input[type="email"]');
+      if (emailInput && emailInput.value) return emailInput.value.trim();
+      return localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+    }
 
-  <!-- DEPOSIT SHEET (REAL PAYSTACK CHECKOUT) -->
-  <div id="depositSheet" class="sheet-backdrop hidden" onclick="if(event.target===this) closeSheet('depositSheet')">
-    <div class="sheet">
-      <div class="card-title"><span>Fund Wallet via Paystack</span><span style="cursor:pointer;" onclick="closeSheet('depositSheet')">✕</span></div>
-      <div class="input-group">
-        <label class="input-label"><span>Amount in Naira (₦)</span><span>Min ₦100</span></label>
-        <input id="depositAmount" type="number" inputmode="numeric" placeholder="5000" value="2000" />
-      </div>
-      <button id="depositSubmitBtn" class="primary-btn" onclick="startPaystackDeposit()">Proceed to Paystack Checkout</button>
-    </div>
-  </div>
+    async function loadEarnTasks(userEmail) {
+      const container = document.getElementById('earn-tasks-list');
+      if (!container) return;
 
-  <!-- WITHDRAW SHEET (LIVE NUBAN RESOLUTION) -->
-  <div id="withdrawSheet" class="sheet-backdrop hidden" onclick="if(event.target===this) closeSheet('withdrawSheet')">
-    <div class="sheet">
-      <div class="card-title"><span>Withdraw to Nigerian Bank</span><span style="cursor:pointer;" onclick="closeSheet('withdrawSheet')">✕</span></div>
-      <div class="input-group">
-        <label class="input-label"><span>Select Bank</span></label>
-        <select id="withdrawBank"></select>
-      </div>
-      <div class="input-group">
-        <label class="input-label"><span>10-Digit Account Number</span><span id="withdrawDigitCount">0/10</span></label>
-        <input id="withdrawAccount" type="tel" inputmode="numeric" maxlength="10" placeholder="0123456789" />
-      </div>
-      <div id="withdrawVerifyStatus" class="hidden"></div>
-      <div class="input-group">
-        <label class="input-label"><span>Withdrawal Amount (₦)</span><span>Min ₦500</span></label>
-        <input id="withdrawAmount" type="number" inputmode="numeric" placeholder="1000" />
-      </div>
-      <button id="withdrawSubmitBtn" class="primary-btn" onclick="submitWithdrawal()" disabled>Confirm Verified Payout</button>
-    </div>
-  </div>
+      try {
+        const res = await fetch('/api/tasks');
+        const data = await res.json();
 
-  <script src="/js/app.js"></script>
+        if (!data.status || !Array.isArray(data.tasks)) {
+          container.innerHTML = '<p style="font-size:13px; color:var(--muted);">Could not load tasks right now.</p>';
+          return;
+        }
+
+        container.innerHTML = '';
+
+        data.tasks.forEach((task) => {
+          const card = document.createElement('div');
+          card.className = 'task-card';
+          card.innerHTML = `
+            <div>
+              <div class="task-title">${task.title}</div>
+              <div class="task-reward">+₦${Number(task.reward_ngn).toFixed(2)}</div>
+            </div>
+            <div class="task-actions">
+              <a href="${task.url}" target="_blank" rel="noopener noreferrer">Open</a>
+              <button type="button" data-task-id="${task.id}">Claim Reward</button>
+            </div>
+          `;
+
+          const claimBtn = card.querySelector('button');
+          claimBtn.addEventListener('click', async () => {
+            const activeEmail = (userEmail || getCurrentUserEmail() || '').trim();
+            if (!activeEmail) {
+              alert('Please sign in or enter your email first.');
+              return;
+            }
+
+            claimBtn.disabled = true;
+            claimBtn.textContent = 'Claiming...';
+
+            try {
+              const claimRes = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: activeEmail,
+                  task_id: task.id
+                })
+              });
+              const claimData = await claimRes.json();
+
+              if (!claimRes.ok || !claimData.status) {
+                alert(claimData.message || 'Could not claim task.');
+                claimBtn.disabled = false;
+                claimBtn.textContent = 'Claim Reward';
+                return;
+              }
+
+              claimBtn.textContent = 'Claimed';
+              const balanceEl = document.getElementById('walletBalance');
+              if (balanceEl && typeof claimData.balance_kobo === 'number') {
+                balanceEl.textContent = `₦${(claimData.balance_kobo / 100).toFixed(2)}`;
+              }
+              if (typeof window.renderDashboard === 'function') {
+                window.renderDashboard();
+              }
+            } catch (err) {
+              alert('Network error while claiming task.');
+              claimBtn.disabled = false;
+              claimBtn.textContent = 'Claim Reward';
+            }
+          });
+
+          container.appendChild(card);
+        });
+      } catch (err) {
+        container.innerHTML = '<p style="font-size:13px; color:var(--muted);">Error loading tasks.</p>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof window.switchTab === 'function') {
+        const originalSwitchTab = window.switchTab;
+        window.switchTab = function (tabName, ...args) {
+          const result = originalSwitchTab.apply(this, [tabName, ...args]);
+          if (tabName === 'earnTab') {
+            loadEarnTasks();
+          }
+          return result;
+        };
+      }
+      loadEarnTasks();
+    });
+  </script>
 </body>
 </html>
