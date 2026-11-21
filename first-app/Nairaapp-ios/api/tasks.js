@@ -4,7 +4,7 @@ const TASKS = {
   x_follow: {
     id: 'x_follow',
     title: 'Follow our X page',
-    rewardKobo: 3000, // ₦3,000
+    rewardKobo: 30000, // ₦3,000
     url: 'https://x.com/godswilleva'
   },
   tiktok_follow: {
@@ -13,12 +13,12 @@ const TASKS = {
     rewardKobo: 3000000, // ₦30,000
     url: 'https://tiktok.com/@itzskiv0id'
   },
-  quick_survey: {
-    id: 'quick_survey',
-    title: 'Complete quick user survey',
-    rewardKobo: 30000, // ₦50,000
-    url: 'https://your-survey-link.example'
-  }
+ whatsapp_follow: {
+    id: 'whatsapp_follow',
+    title: 'Follow our Whatsapp group',
+    rewardKobo: 3000000, // ₦30,000
+    url: 'https://chat.whatsapp.com/EVkbFxFHXG0JgLhohIgysE'
+  },
 };
 
 export default async function handler(req, res) {
