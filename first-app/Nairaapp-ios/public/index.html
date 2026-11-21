@@ -4,25 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NairaFly</title>
-  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
   <div class="phone-shell">
-    <div id="mainView" class="hidden">
+    <div id="mainView">
       <!-- HOME TAB -->
       <div id="homeTab">
         <div class="wallet-card">
           <div>AVAILABLE NAIRA BALANCE</div>
           <div class="balance-amount" id="walletBalance">₦0.00</div>
           <div class="action-grid">
-            <button type="button" onclick="switchTab('earnTab')">Earn</button>
+            <button type="button" class="action-btn gold" onclick="switchTab('earnTab')">Earn</button>
           </div>
         </div>
         <div id="txList"></div>
       </div>
 
       <!-- EARN TAB -->
-      <div id="earnTab" class="hidden">
+      <div id="earnTab">
         <div class="card">
           <div class="card-title">
             <span>CPA &amp; Partner Offers</span>
