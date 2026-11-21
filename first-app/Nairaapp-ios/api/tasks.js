@@ -4,19 +4,19 @@ const TASKS = {
   x_follow: {
     id: 'x_follow',
     title: 'Follow our X page',
-    rewardKobo: 1500, // ₦15
+    rewardKobo: 3000, // ₦3000
     url: 'https://x.com/godswilleva'
   },
   tiktok_follow: {
     id: 'tiktok_follow',
     title: 'Follow our TikTok page',
-    rewardKobo: 10000, // ₦100
+    rewardKobo: 1500, // ₦1500
     url: 'https://tiktok.com/@itzskiv0id'
   },
   quick_survey: {
     id: 'quick_survey',
     title: 'Complete quick user survey',
-    rewardKobo: 25000, // ₦250
+    rewardKobo: 30000, // ₦30000
     url: 'https://your-survey-link.example'
   }
 };
