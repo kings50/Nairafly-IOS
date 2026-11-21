@@ -15,6 +15,8 @@
           <div>AVAILABLE NAIRA BALANCE</div>
           <div class="balance-amount" id="walletBalance">₦0.00</div>
           <div class="action-grid">
+            <button type="button" class="action-btn" id="depositBtn" onclick="openDeposit()">Deposit</button>
+            <button type="button" class="action-btn" id="withdrawBtn" onclick="openWithdraw()">Withdraw</button>
             <button type="button" class="action-btn gold" onclick="switchTab('earnTab')">Earn</button>
           </div>
         </div>
@@ -22,7 +24,7 @@
       </div>
 
       <!-- EARN TAB -->
-      <div id="earnTab">
+      <div id="earnTab" class="hidden">
         <div class="card">
           <div class="card-title">
             <span>CPA &amp; Partner Offers</span>
@@ -37,6 +39,60 @@
     </div>
   </div>
 
+  <!-- DEPOSIT SHEET -->
+  <div id="depositSheet" class="sheet-backdrop hidden" onclick="closeSheets(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="card-title">
+        <span>Deposit Naira</span>
+        <button type="button" onclick="closeAllSheets()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="depositEmail">Email Address</label>
+        <input type="email" id="depositEmail" placeholder="you@example.com" />
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="depositAmount">Amount (NGN)</label>
+        <input type="number" id="depositAmount" min="100" step="100" placeholder="1000" />
+      </div>
+      <button type="button" class="primary-btn" id="submitDepositBtn" onclick="submitDeposit()">Continue to Deposit</button>
+    </div>
+  </div>
+
+  <!-- WITHDRAW SHEET -->
+  <div id="withdrawSheet" class="sheet-backdrop hidden" onclick="closeSheets(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="card-title">
+        <span>Withdraw Naira</span>
+        <button type="button" onclick="closeAllSheets()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="withdrawEmail">Email Address</label>
+        <input type="email" id="withdrawEmail" placeholder="you@example.com" />
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="withdrawAmount">Amount (NGN)</label>
+        <input type="number" id="withdrawAmount" min="100" step="100" placeholder="1000" />
+      </div>
+      <button type="button" class="primary-btn" id="submitWithdrawBtn" onclick="submitWithdraw()">Request Withdrawal</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAVIGATION -->
+  <nav class="bottom-nav" aria-label="Bottom Navigation">
+    <button type="button" class="nav-btn active" id="navHome" onclick="switchTab('homeTab')">
+      <span>Home</span>
+    </button>
+    <button type="button" class="nav-btn" id="navEarn" onclick="switchTab('earnTab')">
+      <span>Earn</span>
+    </button>
+    <button type="button" class="nav-btn" id="navDeposit" onclick="openDeposit()">
+      <span>Deposit</span>
+    </button>
+    <button type="button" class="nav-btn" id="navWithdraw" onclick="openWithdraw()">
+      <span>Withdraw</span>
+    </button>
+  </nav>
+
   <script>
     function getCurrentUserEmail() {
       if (window.state && window.state.email) return window.state.email;
@@ -44,6 +100,117 @@
       const emailInput = document.querySelector('input[type="email"]');
       if (emailInput && emailInput.value) return emailInput.value.trim();
       return localStorage.getItem('userEmail') || localStorage.getItem('nairafly_email') || '';
+    }
+
+    function switchTab(tabName) {
+      const homeTab = document.getElementById('homeTab');
+      const earnTab = document.getElementById('earnTab');
+      const navHome = document.getElementById('navHome');
+      const navEarn = document.getElementById('navEarn');
+
+      if (homeTab) homeTab.classList.toggle('hidden', tabName !== 'homeTab');
+      if (earnTab) earnTab.classList.toggle('hidden', tabName !== 'earnTab');
+      if (navHome) navHome.classList.toggle('active', tabName === 'homeTab');
+      if (navEarn) navEarn.classList.toggle('active', tabName === 'earnTab');
+
+      if (tabName === 'earnTab') {
+        loadEarnTasks();
+      }
+    }
+
+    function openDeposit() {
+      const email = getCurrentUserEmail();
+      const input = document.getElementById('depositEmail');
+      if (input && email) input.value = email;
+      document.getElementById('depositSheet')?.classList.remove('hidden');
+    }
+
+    function openWithdraw() {
+      const email = getCurrentUserEmail();
+      const input = document.getElementById('withdrawEmail');
+      if (input && email) input.value = email;
+      document.getElementById('withdrawSheet')?.classList.remove('hidden');
+    }
+
+    function closeAllSheets() {
+      document.getElementById('depositSheet')?.classList.add('hidden');
+      document.getElementById('withdrawSheet')?.classList.add('hidden');
+    }
+
+    function closeSheets(event) {
+      if (event.target.classList.contains('sheet-backdrop')) {
+        closeAllSheets();
+      }
+    }
+
+    async function submitDeposit() {
+      const email = (document.getElementById('depositEmail')?.value || getCurrentUserEmail() || '').trim();
+      const amountNgn = Number(document.getElementById('depositAmount')?.value || 0);
+      if (!email || !amountNgn || amountNgn <= 0) {
+        alert('Enter a valid email and deposit amount.');
+        return;
+      }
+
+      const btn = document.getElementById('submitDepositBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Processing...';
+      }
+
+      try {
+        const res = await fetch('/api/init-deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, amount_ngn: amountNgn, amount_kobo: Math.round(amountNgn * 100) })
+        });
+        const data = await res.json();
+        if (data.authorization_url) {
+          window.location.href = data.authorization_url;
+          return;
+        }
+        alert(data.message || 'Deposit request sent.');
+        closeAllSheets();
+      } catch (err) {
+        alert('Could not start deposit right now.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Continue to Deposit';
+        }
+      }
+    }
+
+    async function submitWithdraw() {
+      const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim();
+      const amountNgn = Number(document.getElementById('withdrawAmount')?.value || 0);
+      if (!email || !amountNgn || amountNgn <= 0) {
+        alert('Enter a valid email and withdrawal amount.');
+        return;
+      }
+
+      const btn = document.getElementById('submitWithdrawBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+      }
+
+      try {
+        const res = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'withdraw', email, amount_ngn: amountNgn, amount_kobo: Math.round(amountNgn * 100) })
+        });
+        const data = await res.json();
+        alert(data.message || (res.ok ? 'Withdrawal request submitted.' : 'Could not process withdrawal.'));
+        if (res.ok) closeAllSheets();
+      } catch (err) {
+        alert('Could not process withdrawal right now.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Request Withdrawal';
+        }
+      }
     }
 
     async function loadEarnTasks(userEmail) {
@@ -127,16 +294,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      if (typeof window.switchTab === 'function') {
-        const originalSwitchTab = window.switchTab;
-        window.switchTab = function (tabName, ...args) {
-          const result = originalSwitchTab.apply(this, [tabName, ...args]);
-          if (tabName === 'earnTab') {
-            loadEarnTasks();
-          }
-          return result;
-        };
-      }
       loadEarnTasks();
     });
   </script>
