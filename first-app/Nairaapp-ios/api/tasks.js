@@ -3,13 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 const TASKS = {
   x_follow: {
     id: 'x_follow',
-    title: 'Follow our X page (@godswilleva)',
+    title: 'Follow our X page',
     rewardKobo: 1500, // ₦15
     url: 'https://x.com/godswilleva'
   },
   tiktok_follow: {
     id: 'tiktok_follow',
-    title: 'Follow our TikTok page (@itzskiv0id)',
+    title: 'Follow our TikTok page',
     rewardKobo: 10000, // ₦100
     url: 'https://tiktok.com/@itzskiv0id'
   },
