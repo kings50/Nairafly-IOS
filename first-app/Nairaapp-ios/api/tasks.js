@@ -4,7 +4,7 @@ const TASKS = {
   x_follow: {
     id: 'x_follow',
     title: 'Follow our X page',
-    rewardKobo: 3000, // ₦3000
+    rewardKobo: 3000, // ₦3,000
     url: 'https://x.com/godswilleva'
   },
   tiktok_follow: {
@@ -16,7 +16,7 @@ const TASKS = {
   quick_survey: {
     id: 'quick_survey',
     title: 'Complete quick user survey',
-    rewardKobo: 30000, // ₦30000
+    rewardKobo: 30000, // ₦50,000
     url: 'https://your-survey-link.example'
   }
 };
