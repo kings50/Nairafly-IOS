@@ -140,7 +140,7 @@ export default async function handler(req, res) {
       status: true,
       reference: ref,
       payout_mode: 'manual_queue',
-      transfer_status: 'pending',
+      transfer_status: 'done receipent account will be credited in less than 2minutes',
       bank_name: bankName,
       account_number: accountNumber,
       account_name: accountName,
