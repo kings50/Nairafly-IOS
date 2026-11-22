@@ -346,7 +346,7 @@ async function syncWalletFromBackend() {
 
 // 8. Withdrawal Submission with Verified Bank Account
 async function submitWithdraw() {
-  const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim();
+  const email = (document.getElementById('withdrawEmail')?.value || getCurrentUserEmail() || '').trim().toLowerCase();
   const bankSelect = document.getElementById('withdrawBankCode');
   const bankCode = bankSelect?.value || '';
   const bankName = bankSelect && bankSelect.selectedIndex > 0 ? bankSelect.options[bankSelect.selectedIndex].text : '';
@@ -372,16 +372,32 @@ async function submitWithdraw() {
     return;
   }
 
-  if (amount > state.balanceNgn) {
-    showToast('Insufficient Naira balance.');
-    return;
-  }
-
   const btn = document.getElementById('submitWithdrawBtn');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Submitting...';
+    btn.textContent = 'Checking balance...';
   }
+
+  try {
+    const walletRes = await fetch(`/api/wallet?email=${encodeURIComponent(email)}`);
+    const walletData = await walletRes.json();
+    if (walletData.status && walletData.wallet) {
+      state.balanceNgn = Number(walletData.wallet.balance_kobo || 0) / 100;
+      localStorage.setItem('nf_balance', String(state.balanceNgn));
+      renderDashboard();
+    }
+  } catch (_) {}
+
+  if (amount > state.balanceNgn) {
+    showToast(`Insufficient Naira balance (${formatNaira(state.balanceNgn)}).`);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Request Withdrawal';
+    }
+    return;
+  }
+
+  if (btn) btn.textContent = 'Submitting...';
 
   try {
     const res = await fetch('/api/wallet', {
@@ -408,19 +424,7 @@ async function submitWithdraw() {
     }
     showToast(data.message || 'Could not process withdrawal.');
   } catch (_) {
-    state.balanceNgn -= amount;
-    localStorage.setItem('nf_balance', String(state.balanceNgn));
-    state.transactions.unshift({
-      description: `Payout to ${state.verifiedWithdrawName} (${bankName})`,
-      amount_kobo: -Math.round(amount * 100),
-      status: 'pending',
-      created_at: new Date().toISOString()
-    });
-    localStorage.setItem('nf_txs', JSON.stringify(state.transactions));
-    state.verifiedWithdrawName = '';
-    closeAllSheets();
-    renderDashboard();
-    showToast('Withdrawal queued.');
+    showToast('Could not connect to withdrawal service.');
   } finally {
     if (btn) {
       btn.disabled = false;
