@@ -19,6 +19,24 @@ const TASKS = {
     rewardKobo: 3000000, // ₦30,000
     url: 'https://chat.whatsapp.com/EVkbFxFHXG0JgLhohIgysE'
   },
+  ig_follow: {
+    id: 'ig_follow',
+    title: 'Follow our instagram page',
+    rewardKobo: 30000, // ₦3,000
+    url: ''
+  },
+  linkedin_follow: {
+    id: 'linkedin_follow',
+    title: 'Follow our Linkedin page',
+    rewardKobo: 3000000, // ₦30,000
+    url: 'www.linkedin.com/in/juliana-iroka-aca-c-8469b12ab'
+  },
+ whatsapp_follow: {
+    id: 'follow our channel',
+    title: 'Follow our Whatsapp group',
+    rewardKobo: 25000, // ₦2,500
+    url: 'https://whatsapp.com/channel/0029Vb9C3gS6hENmkXMDTG2K'
+  },
 };
 
 export default async function handler(req, res) {
