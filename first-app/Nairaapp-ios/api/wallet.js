@@ -78,6 +78,7 @@ export default async function handler(req, res) {
     const amountNgn = Number(body.amount_ngn || 0);
     const amountKobo = Math.round(amountNgn * 100);
     const bankCode = String(body.bank_code || '').trim();
+    const bankName = String(body.bank_name || '').trim();
     const accountNumber = String(body.account_number || '').trim();
     const accountName = String(body.account_name || '').trim();
 
@@ -87,10 +88,6 @@ export default async function handler(req, res) {
 
     if (!bankCode || accountNumber.length !== 10 || !accountName) {
       return res.status(400).json({ status: false, message: 'Verified bank details are required.' });
-    }
-
-    if (!process.env.PAYSTACK_SECRET_KEY) {
-      return res.status(500).json({ status: false, message: 'PAYSTACK_SECRET_KEY is not configured.' });
     }
 
     const { data: wallet, error: fetchErr } = await supabase
@@ -111,63 +108,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1. Create Paystack Transfer Recipient
-    const recipientRes = await fetch('https://api.paystack.co/transferrecipient', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        type: 'nuban',
-        name: accountName,
-        account_number: accountNumber,
-        bank_code: bankCode,
-        currency: 'NGN'
-      })
-    });
-    const recipientData = await recipientRes.json();
-
-    if (!recipientRes.ok || !recipientData.status || !recipientData.data?.recipient_code) {
-      return res.status(400).json({
-        status: false,
-        message: recipientData.message || 'Could not create Paystack transfer recipient.'
-      });
-    }
-
-    // 2. Initiate Paystack Transfer (reference must be 16-50 lowercase chars/digits/_/-)
-    const ref = `nf_wd_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const transferRes = await fetch('https://api.paystack.co/transfer', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        source: 'balance',
-        amount: amountKobo,
-        recipient: recipientData.data.recipient_code,
-        reference: ref,
-        reason: 'NairaFly Wallet Withdrawal'
-      })
-    });
-    const transferData = await transferRes.json();
-
-    if (!transferRes.ok || !transferData.status) {
-      return res.status(400).json({
-        status: false,
-        message: transferData.message || 'Paystack transfer failed. Check your Paystack balance.'
-      });
-    }
-
-    // 3. Deduct wallet balance and log transaction in Supabase
     const nextKobo = currentKobo - amountKobo;
     const { error: updateErr } = await supabase
       .from('wallets')
       .update({
         balance_kobo: nextKobo,
         bank_code: bankCode,
-        bank_name: body.bank_name || null,
+        bank_name: bankName || null,
         account_number: accountNumber,
         account_name: accountName
       })
@@ -177,18 +124,26 @@ export default async function handler(req, res) {
       return res.status(500).json({ status: false, message: updateErr.message });
     }
 
-    await supabase.from('transactions').insert({
+    const ref = `nf_wd_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const { error: txErr } = await supabase.from('transactions').insert({
       reference: ref,
       user_email: email,
       type: 'withdrawal',
       amount_kobo: -amountKobo
     });
 
+    if (txErr) {
+      return res.status(500).json({ status: false, message: txErr.message });
+    }
+
     return res.status(200).json({
       status: true,
       reference: ref,
-      transfer_code: transferData.data?.transfer_code || null,
-      transfer_status: transferData.data?.status || 'pending',
+      payout_mode: 'manual_queue',
+      transfer_status: 'pending',
+      bank_name: bankName,
+      account_number: accountNumber,
+      account_name: accountName,
       balance_kobo: nextKobo
     });
   }
